@@ -11,6 +11,9 @@ import shutil
 # Exit code to use to indicate to git bisect to skip this commit
 GIT_SKIP_COMMIT_EXIT_CODE = 125
 
+# Default path to model
+MODEL_PATH = "./work_models/elm_pb"
+
 
 def cleanup():
     """Make sure BOUT++ directory is clean and submodules correct
@@ -51,7 +54,7 @@ def runtest(nout, repeat=5, path=None, nprocs=4, model=None):
 
     """
     if path is None:
-        path = "./work_models/elm_pb"
+        path = MODEL_PATH
     if model is None:
         model = "elm_pb"
     os.chdir(path)
@@ -118,6 +121,7 @@ if __name__ == "__main__":
     parser.add_argument("--repeat", type=int, default=5, help="Number of repeat runs")
     parser.add_argument("--good", default=None, help="Time for 'good' run")
     parser.add_argument("--bad", default=None, help="Time for 'bad' run")
+    parser.add_argument("--path", default=None, help="Path to model")
 
     args = parser.parse_args()
 
