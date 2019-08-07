@@ -36,11 +36,14 @@ def configure_bout(configure_line=None):
     """
 
     if configure_line is None:
-        configure_line = "./configure -C"
-        "CXXFLAGS='-std=c++11 -fdiagnostics-color=always' "
-        "--with-netcdf --enable-optimize=3 --enable-checks=no"
-        "--disable-backtrace"
+        configure_line = (
+            "./configure -C "
+            "CXXFLAGS='-std=c++11 -fdiagnostics-color=always' "
+            "--with-netcdf --enable-optimize=3 --enable-checks=no "
+            "--disable-backtrace"
+        )
 
+    print(configure_line)
     shell_safe(configure_line)
 
 
