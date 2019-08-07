@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import argparse
 from boututils.run_wrapper import shell, shell_safe
-import os
-import timeit
+import argparse
+import glob
 import numpy as np
+import os
 import shutil
+import timeit
 
 
 # Exit code to use to indicate to git bisect to skip this commit
@@ -94,6 +95,26 @@ def timing_is_good(good, bad, timing):
     return (timing["low"] < half_mark) and (timing["std"] < half_difference)
 
 
+def backup_log_file(commit, directory=None):
+    """Backup log files according to the commit
+
+    """
+
+    if directory is None:
+        directory = "."
+
+    new_log_directory = os.path.join(directory, "logs_{}".format(commit))
+    try:
+        os.mkdir(new_log_directory)
+    except FileExistsError:
+        pass
+
+    old_data_directory = os.path.join(directory, "data")
+    log_files = os.path.join(old_data_directory, "BOUT.log.*")
+    logs = glob.glob(log_files)
+    for log in logs:
+        shutil.copy(src=log, dst=new_log_directory)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -154,6 +175,8 @@ if __name__ == "__main__":
     if args.write:
         with open("bisect_timings", "a") as f:
             f.write(timings)
+
+    backup_log_file(git["commit"], args.path)
 
     if args.good is not None:
         if timing_is_good(good=float(args.good), bad=float(args.bad), timing=runtime):
