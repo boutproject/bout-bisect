@@ -5,6 +5,7 @@ import argparse
 import glob
 import numpy as np
 import os
+import pandas as pd
 import shutil
 import timeit
 
@@ -114,6 +115,50 @@ def backup_log_file(commit, directory=None):
     logs = glob.glob(log_files)
     for log in logs:
         shutil.copy(src=log, dst=new_log_directory)
+
+
+def _get_start_of_timings(logfile):
+    """Return the line number of the start of the timings table
+    """
+    with open(logfile, "r") as f:
+        for line_number, line in enumerate(f):
+            if line.startswith("Sim Time"):
+                return line_number
+
+
+def read_timings_from_logfile(nout, directory="data", logfile="BOUT.log.0"):
+    """Return a pandas dataframe of the timings table from logfile in directory
+
+    """
+
+    path_to_logfile = os.path.join(directory, logfile)
+
+    start_of_timings = _get_start_of_timings(path_to_logfile)
+
+    timing_table = pd.read_csv(
+        path_to_logfile,
+        sep=r"(?:\s+\|\s+|\s{2,})",
+        skiprows=start_of_timings,
+        nrows=nout + 2,
+        engine="python",
+        index_col="Sim Time",
+    )
+
+    columns = ["Calc", "Inv", "Comm", "I/O", "SOLVER"]
+
+    for column in columns:
+        timing_table[column + " (absolute)"] = timing_table["Wall Time"] * (
+            timing_table[column] / 100
+        )
+
+    return timing_table
+
+
+def time_per_rhs(timing_table):
+    """Return the average wall time per rhs eval in timing_table
+    """
+    return timing_table["Wall Time"].sum() / timing_table["RHS evals"].sum()
+
 
 if __name__ == "__main__":
 
