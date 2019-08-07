@@ -25,8 +25,8 @@ def cleanup():
     shell_safe("git submodule update --init --recursive")
 
 
-def build_bout(configure_line=None):
-    """Configure and build BOUT++
+def configure_bout(configure_line=None):
+    """Configure BOUT++
 
     """
 
@@ -37,6 +37,11 @@ def build_bout(configure_line=None):
         "--disable-backtrace"
 
     shell_safe(configure_line)
+
+
+def build_bout(configure_line=None):
+    """Build BOUT++
+    """
     shell_safe("make -j8")
 
 
@@ -92,9 +97,24 @@ if __name__ == "__main__":
         description="git bisect script for performance regression"
     )
     parser.add_argument("--nout", type=int, default=100, help="Number of timesteps")
-    parser.add_argument("--no-clean", action="store_true", help="Don't clean library")
-    parser.add_argument("--no-make", action="store_true", help="Don't build library")
-    parser.add_argument("--no-write", action="store_true", help="Don't write to file")
+    parser.add_argument(
+        "--no-clean", action="store_false", dest="clean", help="Don't clean library"
+    )
+    parser.add_argument(
+        "--no-configure",
+        action="store_false",
+        dest="configure",
+        help="Don't configure library",
+    )
+    parser.add_argument(
+        "--no-make", action="store_false", dest="make", help="Don't build library"
+    )
+    parser.add_argument(
+        "--no-write", action="store_false", dest="write", help="Don't write to file"
+    )
+    parser.add_argument(
+        "--just-run", action="store_true", help="Don't cleanup/configure/build/write"
+    )
     parser.add_argument("--repeat", type=int, default=5, help="Number of repeat runs")
     parser.add_argument("--good", default=None, help="Time for 'good' run")
     parser.add_argument("--bad", default=None, help="Time for 'bad' run")
@@ -104,11 +124,17 @@ if __name__ == "__main__":
     if (args.good is None) ^ (args.bad is None):
         raise RuntimeError("You must supply either both of good and bad, or neither")
 
+    if args.just_run:
+        args.clean = args.configure = args.make = args.write = False
+
     try:
-        if not args.no_clean:
+        if args.clean:
             cleanup()
 
-        if not args.no_make:
+        if args.configure:
+            configure_bout()
+
+        if args.make:
             build_bout()
 
         runtime = runtest(args.nout, repeat=args.repeat)
@@ -121,7 +147,7 @@ if __name__ == "__main__":
 
     print(timings)
 
-    if not args.no_write:
+    if args.write:
         with open("bisect_timings", "a") as f:
             f.write(timings)
 
