@@ -157,10 +157,22 @@ def read_timings_from_logfile(nout, directory="data", logfile="BOUT.log.0"):
     return timing_table
 
 
+def total_rhs(timing_table):
+    """Return the total number of rhs evals in timing_table
+    """
+    return timing_table["RHS evals"].sum()
+
+
+def average_per_rhs(timing_table, column):
+    """Return the average `timing_table[column]` per rhs eval
+    """
+    return timing_table[column].sum() / total_rhs(timing_table)
+
+
 def time_per_rhs(timing_table):
     """Return the average wall time per rhs eval in timing_table
     """
-    return timing_table["Wall Time"].sum() / timing_table["RHS evals"].sum()
+    return average_per_rhs(timing_table, "Wall Time")
 
 
 if __name__ == "__main__":
