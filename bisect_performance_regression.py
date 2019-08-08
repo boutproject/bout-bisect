@@ -85,18 +85,32 @@ def git_info():
     return {"commit": git_commit[:7], "date": commit_date.strip()}
 
 
-def timing_is_good(good, bad, timing):
-    """Return true if timing is closer to the good timing than the bad timing
+def metric_is_good(good, bad, metric, metric_std=0.0, factor=0.5):
+    """Return true if `metric` is closer to `good` than `bad`, assuming
+    that the standard deviation is not too large
 
-    timing should be a dict containing "mean" and "std"
+    Parameters
+    ----------
+    good : float
+        The "good" value of the metric, should be less than bad
+    bad : float
+        The "bad" value of the metric, should be greater than good
+    metric : float
+        The metric to compare to good, bad
+    metric_std : float, optional
+        The standard deviation of the metric. If this is larger than
+        `factor * (bad - good)`, the metric is consider "good"
+    factor : float, optional
+        How far between good and bad is still considered good. A
+        factor of 0.5 means that if metric is less than `0.5*(bad -
+        good)`, it is "good"
 
     """
 
-    # Runtime halfway between the good and bad timings
-    half_difference = (bad - good) / 2.0
-    half_mark = good + half_difference
+    weighted_difference = factor * (bad - good)
+    good_zone = good + weighted_difference
 
-    return (timing["low"] < half_mark) and (timing["std"] < half_difference)
+    return (metric < good_zone) and (metric_std < weighted_difference)
 
 
 def backup_log_file(commit, directory=None):
@@ -239,7 +253,12 @@ if __name__ == "__main__":
     backup_log_file(git["commit"], args.path)
 
     if args.good is not None:
-        if timing_is_good(good=float(args.good), bad=float(args.bad), timing=runtime):
+        if metric_is_good(
+            good=float(args.good),
+            bad=float(args.bad),
+            metric=runtime["low"],
+            metric_std=runtime["std"],
+        ):
             exit(0)
         else:
             exit(1)
