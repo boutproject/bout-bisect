@@ -2,6 +2,7 @@
 
 from boututils.run_wrapper import shell, shell_safe
 import argparse
+import datetime
 import glob
 import numpy as np
 import os
@@ -53,7 +54,7 @@ def build_bout(configure_line=None):
     shell_safe("make -j8")
 
 
-def runtest(nout, repeat=5, path=None, nprocs=4, model=None):
+def runtest(nout, repeat=5, path=None, nprocs=4, model=None, log_dir=None):
     """Run `model` in `path` `repeat` times, returning the mean runtime
     and its standard deviation
 
@@ -70,7 +71,11 @@ def runtest(nout, repeat=5, path=None, nprocs=4, model=None):
         model=model, nout=nout, nprocs=nprocs
     )
 
-    runtime = timeit.repeat(lambda: shell_safe(command), number=1, repeat=repeat)
+    runtime = []
+
+    for run_number in range(repeat):
+        runtime.append(timeit.timeit(lambda: shell_safe(command), number=1))
+        backup_log_file(log_dir, subdir="run{:02d}".format(run_number))
 
     return {"mean": np.mean(runtime), "std": np.std(runtime), "low": np.min(runtime)}
 
@@ -113,21 +118,25 @@ def metric_is_good(good, bad, metric, metric_std=0.0, factor=0.5):
     return (metric < good_zone) and (metric_std < weighted_difference)
 
 
-def backup_log_file(commit, directory=None):
+def backup_log_file(directory=None, subdir=None):
     """Backup log files according to the commit
 
     """
 
     if directory is None:
-        directory = "."
+        directory = "backup_logs_{:d}".format(int(datetime.datetime.now().timestamp()))
 
-    new_log_directory = os.path.join(directory, "logs_{}".format(commit))
+    if subdir is not None:
+        new_log_directory = os.path.join(directory, subdir)
+    else:
+        new_log_directory = directory
+
     try:
-        os.mkdir(new_log_directory)
+        os.makedirs(new_log_directory)
     except FileExistsError:
         pass
 
-    old_data_directory = os.path.join(directory, "data")
+    old_data_directory = "data"
     log_files = os.path.join(old_data_directory, "BOUT.log.*")
     logs = glob.glob(log_files)
     for log in logs:
@@ -216,7 +225,8 @@ if __name__ == "__main__":
     parser.add_argument("--repeat", type=int, default=5, help="Number of repeat runs")
     parser.add_argument("--good", default=None, help="Time for 'good' run")
     parser.add_argument("--bad", default=None, help="Time for 'bad' run")
-    parser.add_argument("--path", default=None, help="Path to model")
+    parser.add_argument("--path", default=MODEL_PATH, help="Path to model")
+    parser.add_argument("--log-dir", default="logs", help="Backup log file directory")
 
     args = parser.parse_args()
 
@@ -225,6 +235,10 @@ if __name__ == "__main__":
 
     if args.just_run:
         args.clean = args.configure = args.make = args.write = False
+
+    git = git_info()
+
+    log_dir = os.path.join(args.log_dir, git["commit"])
 
     try:
         if args.clean:
@@ -236,11 +250,9 @@ if __name__ == "__main__":
         if args.make:
             build_bout()
 
-        runtime = runtest(args.nout, repeat=args.repeat)
+        runtime = runtest(args.nout, repeat=args.repeat, log_dir=log_dir)
     except RuntimeError:
         exit(GIT_SKIP_COMMIT_EXIT_CODE)
-
-    git = git_info()
 
     timings = "{commit}, {date}, {mean}, {std}, {low},\n".format(**git, **runtime)
 
@@ -249,8 +261,6 @@ if __name__ == "__main__":
     if args.write:
         with open("bisect_timings", "a") as f:
             f.write(timings)
-
-    backup_log_file(git["commit"], args.path)
 
     if args.good is not None:
         if metric_is_good(
