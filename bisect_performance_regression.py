@@ -115,6 +115,7 @@ def metric_is_good(good, bad, metric, metric_std=0.0, factor=0.5):
     weighted_difference = factor * (bad - good)
     good_zone = good + weighted_difference
 
+    print("metric is {}, max good value is {}".format(metric, good_zone))
     return (metric < good_zone) and (metric_std < weighted_difference)
 
 
@@ -198,6 +199,16 @@ def time_per_rhs(timing_table):
     return average_per_rhs(timing_table, "Wall Time")
 
 
+def average_and_std_per_rhs(timing_table, column):
+    """Return the average `timing_table[column]` per rhs eval, and its
+    standard deviation
+
+    """
+
+    value_per_rhs = timing_table[column] / timing_table["RHS evals"]
+    return {"mean": value_per_rhs.mean(), "std": value_per_rhs.std()}
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
@@ -228,6 +239,15 @@ if __name__ == "__main__":
     parser.add_argument("--path", default=MODEL_PATH, help="Path to model")
     parser.add_argument("--log-dir", default="logs", help="Backup log file directory")
 
+    # How to keep in sync with dict `metrics` below?
+    metric_choices = ["runtime-low", "runtime-mean", "inv_per_rhs", "time_per_rhs"]
+    parser.add_argument(
+        "--metric",
+        choices=metric_choices,
+        default="runtime-low",
+        help="What metric to use",
+    )
+
     args = parser.parse_args()
 
     if (args.good is None) ^ (args.bad is None):
@@ -254,7 +274,9 @@ if __name__ == "__main__":
     except RuntimeError:
         exit(GIT_SKIP_COMMIT_EXIT_CODE)
 
-    timings = "{commit}, {date}, {mean}, {std}, {low},\n".format(**git, **runtime)
+    timings = "{commit}, {date}, {mean}, {std}, {low}, {dir}\n".format(
+        **git, **runtime, dir=log_dir
+    )
 
     print(timings)
 
@@ -263,11 +285,41 @@ if __name__ == "__main__":
             f.write(timings)
 
     if args.good is not None:
+        invs_per_rhs = 0.0
+        times_per_rhs = 0.0
+
+        if not args.metric.startswith("runtime"):
+            runs = [
+                os.path.join(log_dir, "run{:02d}".format(run))
+                for run in range(args.repeat)
+            ]
+            dfs = {
+                run: read_timings_from_logfile(args.nout, directory=run) for run in runs
+            }
+
+            invs_per_rhs = [
+                average_per_rhs(df, "Inv (absolute)") for df in dfs.values()
+            ]
+            times_per_rhs = [time_per_rhs(df) for df in dfs.values()]
+
+        metrics = {
+            "runtime-low": {"metric": runtime["low"], "std": runtime["std"]},
+            "runtime-mean": {"metric": runtime["mean"], "std": runtime["std"]},
+            "inv_per_rhs": {
+                "metric": np.min(invs_per_rhs),
+                "std": np.std(invs_per_rhs),
+            },
+            "time_per_rhs": {
+                "metric": np.min(times_per_rhs),
+                "std": np.std(times_per_rhs),
+            },
+        }
+
         if metric_is_good(
             good=float(args.good),
             bad=float(args.bad),
-            metric=runtime["low"],
-            metric_std=runtime["std"],
+            metric=metrics[args.metric]["metric"],
+            metric_std=metrics[args.metric]["std"],
         ):
             exit(0)
         else:
