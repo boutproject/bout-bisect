@@ -122,7 +122,7 @@ def metric_is_good(good, bad, metric, metric_std=0.0, factor=0.5):
     return (metric < good_zone) and (metric_std < weighted_difference)
 
 
-def backup_log_file(directory=None, subdir=None):
+def backup_log_file(directory=None, subdir=None, include_dump_files=True):
     """Backup log files according to the commit
 
     """
@@ -145,6 +145,14 @@ def backup_log_file(directory=None, subdir=None):
     logs = glob.glob(log_files)
     for log in logs:
         shutil.copy(src=log, dst=new_log_directory)
+
+    if not include_dump_files:
+        return
+
+    dmp_files = os.path.join(old_data_directory, "BOUT.dmp.*")
+    dmps = glob.glob(dmp_files)
+    for dmp in dmps:
+        shutil.copy(src=dmp, dst=new_log_directory)
 
 
 def _get_start_of_timings(logfile):
