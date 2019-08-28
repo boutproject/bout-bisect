@@ -15,7 +15,10 @@ import timeit
 GIT_SKIP_COMMIT_EXIT_CODE = 125
 
 # Default path to model
-MODEL_PATH = "./work_models/elm_pb"
+DEFAULT_MODEL_PATH = "./work_models/elm_pb"
+
+# Default model executable
+DEFAULT_MODEL_EXE = "elm_pb"
 
 
 def cleanup():
@@ -60,9 +63,9 @@ def runtest(nout, repeat=5, path=None, nprocs=4, model=None, log_dir=None):
 
     """
     if path is None:
-        path = MODEL_PATH
+        path = DEFAULT_MODEL_PATH
     if model is None:
-        model = "elm_pb"
+        model = DEFAULT_MODEL_EXE
     os.chdir(path)
 
     shell_safe("make")
@@ -236,7 +239,8 @@ if __name__ == "__main__":
     parser.add_argument("--repeat", type=int, default=5, help="Number of repeat runs")
     parser.add_argument("--good", default=None, help="Time for 'good' run")
     parser.add_argument("--bad", default=None, help="Time for 'bad' run")
-    parser.add_argument("--path", default=MODEL_PATH, help="Path to model")
+    parser.add_argument("--path", default=DEFAULT_MODEL_PATH, help="Path to model")
+    parser.add_argument("--model", default=DEFAULT_MODEL_EXE, help="Model executable")
     parser.add_argument("--log-dir", default="logs", help="Backup log file directory")
 
     # How to keep in sync with dict `metrics` below?
@@ -270,7 +274,13 @@ if __name__ == "__main__":
         if args.make:
             build_bout()
 
-        runtime = runtest(args.nout, repeat=args.repeat, log_dir=log_dir)
+        runtime = runtest(
+            args.nout,
+            repeat=args.repeat,
+            log_dir=log_dir,
+            path=args.path,
+            model=args.model,
+        )
     except RuntimeError:
         exit(GIT_SKIP_COMMIT_EXIT_CODE)
 
