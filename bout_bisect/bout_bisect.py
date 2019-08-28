@@ -212,8 +212,7 @@ def average_and_std_per_rhs(timing_table, column):
     return {"mean": value_per_rhs.mean(), "std": value_per_rhs.std()}
 
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(
         description="git bisect script for performance regression"
     )
@@ -345,3 +344,7 @@ if __name__ == "__main__":
             exit(0)
         else:
             exit(1)
+
+
+if __name__ == "__main__":
+    main()
