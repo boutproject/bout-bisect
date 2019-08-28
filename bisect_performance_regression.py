@@ -242,6 +242,9 @@ if __name__ == "__main__":
     parser.add_argument("--path", default=DEFAULT_MODEL_PATH, help="Path to model")
     parser.add_argument("--model", default=DEFAULT_MODEL_EXE, help="Model executable")
     parser.add_argument("--log-dir", default="logs", help="Backup log file directory")
+    parser.add_argument(
+        "--script", default=None, help="Other script to run to determine good/bad"
+    )
 
     # How to keep in sync with dict `metrics` below?
     metric_choices = ["runtime-low", "runtime-mean", "inv_per_rhs", "time_per_rhs"]
@@ -293,6 +296,14 @@ if __name__ == "__main__":
     if args.write:
         with open("bisect_timings", "a") as f:
             f.write(timings)
+
+    if args.script is not None:
+        # If we got an external script to run, run that instead of computing our own metric
+        try:
+            shell_safe(args.script)
+        except RuntimeError:
+            exit(1)
+        exit(0)
 
     if args.good is not None:
         invs_per_rhs = 0.0
