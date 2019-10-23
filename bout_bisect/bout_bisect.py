@@ -294,6 +294,22 @@ def main():
     except RuntimeError:
         exit(GIT_SKIP_COMMIT_EXIT_CODE)
 
+    if args.script is not None:
+        # If we're running an external script, use that instead of
+        # computing our own metric
+        status, result = shell(args.script, pipe=True)
+
+        log_line = '{commit}, {date}, "{result}", {dir}\n'.format(
+            result=result.rstrip("\n"), dir=log_dir, **git
+        )
+        print(log_line)
+
+        if args.write:
+            with open("bisect_script_log", "a") as f:
+                f.write(log_line)
+
+        exit(status)
+
     timings = "{commit}, {date}, {mean}, {std}, {low}, {dir}\n".format(
         **git, **runtime, dir=log_dir
     )
@@ -303,14 +319,6 @@ def main():
     if args.write:
         with open("bisect_timings", "a") as f:
             f.write(timings)
-
-    if args.script is not None:
-        # If we got an external script to run, run that instead of computing our own metric
-        try:
-            shell_safe(args.script)
-        except RuntimeError:
-            exit(1)
-        exit(0)
 
     if args.good is not None:
         invs_per_rhs = 0.0
