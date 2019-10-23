@@ -155,33 +155,63 @@ def backup_log_file(directory=None, subdir=None, include_dump_files=True):
         shutil.copy(src=dmp, dst=new_log_directory)
 
 
-def _get_start_of_timings(logfile):
-    """Return the line number of the start of the timings table
+def _get_start_end_of_timings(logfile):
+    """Return the line numbers of the start and end of the timings table,
+    as well as the total number of lines in the logfile
+
     """
+    total = 0
     with open(logfile, "r") as f:
         for line_number, line in enumerate(f):
             if line.startswith("Sim Time"):
-                return line_number
+                start = line_number
+            if line.startswith("Run finished"):
+                end = line_number
+            total += 1
+    return (start, end, total)
 
 
-def read_timings_from_logfile(nout, directory="data", logfile="BOUT.log.0"):
+def read_timings_from_logfile(
+    nout=None, directory="data", logfile="BOUT.log.0", skip_first=True
+):
     """Return a pandas dataframe of the timings table from logfile in directory
+
+    Parameters
+    ----------
+    nout : int, optional
+        Number of timesteps to read. If None (default), read all available
+    directory : str, optional
+        Directory to read logfile from
+    logfile : str, optional
+        Name of log file to read
+    skip_first : bool, optional
+        If True, don't read the first (i.e. zeroth) timestep. This
+        timestep is only used to generate some initial values, and can
+        skew the statistics if used
 
     """
 
     path_to_logfile = os.path.join(directory, logfile)
 
-    start_of_timings = _get_start_of_timings(path_to_logfile)
+    start, end, _ = _get_start_end_of_timings(path_to_logfile)
+
+    # Two extra rows: header plus blank line
+    if nout is None:
+        nout = end - start - 2
 
     timing_table = pd.read_csv(
         path_to_logfile,
         sep=r"(?:\s+\|\s+|\s{2,})",
-        skiprows=start_of_timings,
-        nrows=nout + 2,
+        skiprows=start,
+        nrows=nout,
         engine="python",
         index_col="Sim Time",
     )
 
+    if skip_first:
+        timing_table = timing_table.drop([0])
+
+    # Convert the following %-times to seconds
     columns = ["Calc", "Inv", "Comm", "I/O", "SOLVER"]
 
     for column in columns:
