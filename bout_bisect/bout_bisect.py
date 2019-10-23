@@ -7,6 +7,7 @@ import glob
 import numpy as np
 import os
 import pandas as pd
+import pathlib
 import shutil
 import timeit
 
@@ -19,6 +20,18 @@ DEFAULT_MODEL_PATH = "./work_models/elm_pb"
 
 # Default model executable
 DEFAULT_MODEL_EXE = "elm_pb"
+
+
+class DataFrameWithName(pd.DataFrame):
+    """Pandas DataFrame but with a "name" attribute that will persist
+
+    """
+
+    _metadata = ["name"]
+
+    @property
+    def _constructor(self):
+        return DataFrameWithName
 
 
 def cleanup():
@@ -172,7 +185,7 @@ def _get_start_end_of_timings(logfile):
 
 
 def read_timings_from_logfile(
-    nout=None, directory="data", logfile="BOUT.log.0", skip_first=True
+    nout=None, directory="data", logfile="BOUT.log.0", skip_first=True, name=None
 ):
     """Return a pandas dataframe of the timings table from logfile in directory
 
@@ -188,6 +201,15 @@ def read_timings_from_logfile(
         If True, don't read the first (i.e. zeroth) timestep. This
         timestep is only used to generate some initial values, and can
         skew the statistics if used
+    name : str, optional
+        Name of this simulation. If None, takes the name from the
+        directory or its immediate parent if the directory is called
+        "data", e.g:
+            directory: "/path/to/simulation"
+            name: "simulation"
+
+            directory: "/path/to/simulation/data"
+            name: "simulation"
 
     """
 
@@ -199,14 +221,25 @@ def read_timings_from_logfile(
     if nout is None:
         nout = end - start - 2
 
-    timing_table = pd.read_csv(
-        path_to_logfile,
-        sep=r"(?:\s+\|\s+|\s{2,})",
-        skiprows=start,
-        nrows=nout,
-        engine="python",
-        index_col="Sim Time",
+    timing_table = DataFrameWithName(
+        pd.read_csv(
+            path_to_logfile,
+            sep=r"(?:\s+\|\s+|\s{2,})",
+            skiprows=start,
+            nrows=nout,
+            engine="python",
+            index_col="Sim Time",
+        )
     )
+
+    # Try to guess a sensible name
+    if name is None:
+        path = pathlib.Path(directory).expanduser().resolve()
+        if path.stem == "data":
+            name = path.parent.stem
+        else:
+            name = path.stem
+    timing_table.name = name
 
     if skip_first:
         timing_table = timing_table.drop([0])
